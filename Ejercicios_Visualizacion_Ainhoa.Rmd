@@ -6,7 +6,7 @@ output:
   pdf_document:
     fig_height: 6
     fig_width: 8
-main_dir: "/Users/ainhoacalleja/Documents/cursos/GEODATA_UVA/1_Gestion_Visualizacion_Datos/Tema3_VisualizacionDatosR/carpeta_ejercicios"
+main_dir: "/cursos/GEODATA_UVA/1_Gestion_Visualizacion_Datos/Tema3_VisualizacionDatosR/carpeta_ejercicios"
 ---
 
 ## Cargas paquetes 
