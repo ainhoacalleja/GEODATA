@@ -1,0 +1,321 @@
+---
+title: "Ejercicios_VisualizacionDatos_Ainhoa"
+author: "Ainhoa Calleja Rodriguez"
+date: "2024-12-07"
+output:
+  pdf_document:
+    fig_height: 6
+    fig_width: 8
+main_dir: "/Users/ainhoacalleja/Documents/cursos/GEODATA_UVA/1_Gestion_Visualizacion_Datos/Tema3_VisualizacionDatosR/carpeta_ejercicios"
+---
+
+## Cargas paquetes 
+Como este Rmd es un archivo común para todos los ejercicios, lo primero que hago es cargar los paquetes necesarios para realizarlos. En mi caso suelo cargarlos con una función, ya que debido a mis necesidades suelo tener que cargar o instalar numerosos paquetes.
+
+```{r, message=FALSE, warning=FALSE, results='hide'}
+
+# Packages needed
+packages <- c("ggplot2", "dplyr", "tidyr", "yaml", "readxl", "ggradar", "tibble","scales", "grid")
+
+# Function to install (if needed) and load packages
+install_and_load <- function(pkg){
+  if (!require(pkg, character.only = TRUE)) {
+    install.packages(pkg, dependencies = TRUE)
+    library(pkg, character.only = TRUE)
+  }
+}
+
+# Apply the function to each package
+lapply(packages, install_and_load)
+```
+
+Para la carga de los archivos de datos necesarios, mi directorio principal está incluído en la parte yaml del Rmd que contiene lo siguiente:
+```{r}
+# Mostrar el YAML completo
+yaml_content <- rmarkdown::yaml_front_matter(knitr::current_input())
+yaml_raw <- yaml::as.yaml(yaml_content)
+cat("Contenido del YAML:\n", yaml_raw)
+```
+
+De esta forma sólo tengo que indicar mi directorio principal y asignar el archivo de datos al nombre que voy a utilizar para cargarlos. He decidido hacer los ejercicios 3, 4, 6 y 8 por tanto los archivos necesarios son los siguientes:
+```{r}
+# Leer el directorio desde el YAML
+main_dir <- rmarkdown::yaml_front_matter(knitr::current_input())$main_dir
+file1 <- file.path(main_dir,"Quercus_raiz.csv") #Ejercicio 3
+file2 <- file.path(main_dir,"Try2023713193415 traits of 34 hebaceous species in Sherbrooke.xlsx")  #Ejercicio 4
+file3 <- file.path(main_dir, "Gasteropodos_ambiente.csv") #Ejercicio 6
+file4 <- file.path(main_dir, "Polinizadores.csv") #Ejercicio 8
+
+```
+
+# Ejercicios
+
+-----------------------------------------------
+
+## Ejercicio 3: Producción roble
+
+En un ensayo sobre producción de robles (*Quercus spp.*) en vivero se ha evaluado el crecimiento de las plántulas de diferentes especies en diferentes sutratos comerciales (Quercus_raiz.csv). Se te pide elaborar un gráfico que resuma el estado de las plántulas en función del sustrato señalando la distribución de datos por cuartiles y la existencia de datos anómalos en su caso. El gráfico debe tener calidad suficiente para ser incluido en una publicación divulgativa del sector. Adjuntar el script utilizado.
+
+### 1. Carga de los datos:
+
+```{r}
+
+quercus <- read.csv2(file1, header = TRUE)
+str(quercus)
+summary(quercus)
+
+```
+
+### 2. Modificaciones.
+Por preferencias personales sustituyo el punto que aparece en los nombres científicos de las especies en la columna especia por un guión bajo "\_".
+
+```{r}
+
+quercus$Especie <- gsub("\\.", "_", quercus$Especie)
+head(quercus)
+
+```
+
+### 3. Gráfico.
+Modifico los datos para darles el formato necesario para incluir tanto la longitud de la raiz como la del tallo en el gráfico. El gráfico elegido ha sido un boxplot para incluir cuartiles así como medias por especie. Además en el gráfico he añadido un comando para destacar en punto de color rojo aquellos datos que puedan ser anómalos. Añado la media a cada boxplot para especie y longitud del tallo o raíz, con un punto del mismo color que la especie así como el valor de la media en texto.
+
+```{r, fig.width=8.27, fig.height=5.5, echo=TRUE}
+
+# Crear una columna para el tipo de medida (Tallo vs Raíz)
+quercus_longitud <- quercus %>%
+  pivot_longer(cols = c(Longitud_tallo, Longitud_raiz), 
+               names_to = "Medida", 
+               values_to = "Valor")
+
+
+quercus_plot <- ggplot(quercus_longitud, aes(x = Sustrato, y = Valor, fill = Especie)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 16, outlier.size = 2, alpha = 0.6,
+               width = 0.9) +  
+  stat_summary(fun = mean, geom = "point", aes(color = Especie), shape = 18, size = 3, 
+               position = position_dodge(width = 0.9)) +  
+  stat_summary(fun = mean, geom = "text", aes(label = round(after_stat(y), 1)), 
+               color = "black", vjust = -1.5, position = position_dodge(width = 0.9)) +  
+  labs(
+    title = "Distribución de la longitud del tallo y raíz por sustrato y especie",
+    x = "Tipo de Sustrato",
+    y = "Longitud (cm)",
+    caption = "Puntos rojos: datos anómalos"
+  ) +
+  scale_color_manual(
+    values = c("Quercus_petraea" = "lightblue", "Quercus_robur" = "palegreen3", 
+               "Quercus_pyrenaica" = "orange"),
+    labels = gsub("_", " ", c("Quercus_petraea", "Quercus_robur", "Quercus_pyrenaica"))
+  ) +  
+  scale_fill_manual(
+    values = c("Quercus_petraea" = "lightblue", "Quercus_robur" = "palegreen3", 
+               "Quercus_pyrenaica" = "orange"),
+    labels = gsub("_", " ", c("Quercus_petraea", "Quercus_robur", "Quercus_pyrenaica"))
+  ) +  
+  facet_wrap(~Medida, scales = "free_y") +  
+  theme(
+    legend.position = "right",  
+    legend.text = element_text(size = 12, face = "italic")  
+  )
+
+
+quercus_plot  #para ver el gráfico al compilar el pdf
+
+# Ruta y nombre del archivo a guardar
+output_file <- file.path(main_dir, "3_grafico_quercus.png")
+
+ggsave(
+  filename = output_file,  
+  plot = quercus_plot,              
+  dpi = 300,                       
+  width = 10,                      
+  height = 8,                       
+  units = "in"                      
+)
+
+
+```
+El resultado es un gráfico que nos indica que la longitud del tallo es mayor con el sustrato tipo A y para el tallo no existen datos anómalos. En el caso de la longitud de la raíz es mayor para el sustrato tipo A aunque la diferencia no es tan destacable para *Quercus robur* y *Quercus pyrenaica*, aunque en estos dos últimos casos existen algunos datos anómalos que podrían haber influido en el resultado.
+
+-----------------------------------------------
+
+## Ejercicio 4: Comparativa fisiológica y morfológica a nivel foliar
+
+En un estudio de ecología vegetal se quiere realizar una comparativa fisiológica y morfológica a nivel foliar de tres especies: *Dactylis glomerata*, *Festuca rubra* y *Erigeron canadensis*  (Yuanzhi Li, 2015)*. Se pide un gráfico radar de calidad publicable en una revista científica internacional en lengua inglesa mostrando la descripción a escala foliar de los tres taxones. Adjuntar el script utilizado.
+
+### 1. Carga de los datos:
+```{r}
+
+Try_dat <- read_excel(file2, sheet ="trait data")
+
+head(Try_dat)
+str(Try_dat)
+summary(Try_dat)
+```
+
+### 2. Modificaciones.
+Como se trata de un estudio a nivel foliar, las características que me interesa analizar son todas las que aparecen bajo la categoria "Leaf traits" que son "LT --> leaf thickness; LA --> leaf area; LDMC --> leaf dry matter; SLA --> leaf area/leaf dry mass; LCC --> leaf carbon concentration; LNC --> leaf carbon concentration; LNC --> leaf nitrogen concentration; MPR --> maximum photosynthesis rate". A continuación reduzco el datadrame a las 3 especies de interes (*Dactylis glomerata*, *Festuca rubra* y *Erigeron canadensis*).
+```{r}
+
+species_of_interest <- c("Dactylis glomerata", "Festuca rubra", "Erigeron canadensis")
+small_dat <- Try_dat %>%
+  filter(Species %in% species_of_interest) %>%
+  select(Species, LT, LA, LDMC, SLA, LCC, LNC, MPR)
+
+```
+
+### 3. Gráfico.
+Las variables de interés están medidas en diferentes unidades y escalas por lo que es necesario normalizarlas para poder representarlas en el gráfico de radar. Con la función rescale() normalizamos para que el rango de la variable esté entre 0 y 1, y así poder comparar todas las variables en el gráfico de radar. Existen otras formas de normalización como Z-score para normalizar todas las variables de forma que tengan una distribución normal con media 0 y desviación estándar de 1. En este último caso podrían existir valores negativos por lo que habría que hacerlos positivos para poder representarlos en el gráfico de radar. En mi caso he optado por la opción rescale().
+
+```{r}
+
+radar_dat <- small_dat %>%
+  mutate(across(-Species, rescale))  # Normalize the data except 'Species'
+
+radar_plot <- ggradar(radar_dat,
+                      axis.label.size = 3,       
+                      group.line.width = 1,       
+                      group.point.size = 3,       
+                      grid.label.size = 4 ,       
+                      group.colours = c("#EEA236", "#5CB85C", "#46B8DA"),
+                      legend.position = "bottom") +
+  theme(legend.text = element_text(face = "italic")) +
+  labs(caption = "Plot acronyms represent, i.e.:\nLT --> leaf thickness\nLA --> leaf area\nLDMC --> leaf dry matter\nSLA --> leaf area/leaf dry mass\nLCC --> leaf carbon concentration\nLNC --> leaf nitrogen concentration\nMPR --> maximum photosynthesis rate") +
+  theme(plot.caption = element_text(size = 8, face = "italic", hjust = 0)) # Adjust caption position
+
+
+radar_plot
+
+# Ruta y nombre del archivo a guardar
+output_file2 <- file.path(main_dir, "4_grafico_radar.pdf")
+
+ggsave(
+  filename = output_file2, 
+  plot = radar_plot, 
+  width = 10, 
+  height = 8
+  )
+
+```
+
+El gráfico muestra las diferencias entre las tres especies en cuanto a varios parámetros. Por ejemplo, *Dactylis glomerata* muestra mayor LA y consecuentemente mayor SLA, mientra que *Erigeron canadensis* tiene mayor LNC y *Festuca rubra* destaca en cuanto a mayor MPR,LT, LDMC Y LCC.
+
+-----------------------------------------------
+
+## Ejercicio 6: Diversidad gasterópodos
+
+Se ha realizado un estudio de diversidad gasterópodos terrestres en un parque natural mediante transectos nocturnos. Se ha registrado, para cada evento de muestreo, la humedad relativa del aire y la temperatura media diarias. Los resultados para una determinada especie se muestran en Gasteropodos_ambiente.csv. ¿Existe algún patrón climático asociado a la mayor abundancia de la especie? Se pide responder a esta pregunta empleando material gráfico listo para ser publicado en una revista ambientalista mensual. Adjuntar el script utilizado.
+
+### 1. Datos
+
+```{r}
+Gdata <- read.csv2(file3, header = TRUE)
+str(Gdata)
+summary(Gdata)
+```
+
+### 2. Gráfico
+En este caso el gráfico que he decidido hacer incluye tanto la variable humedad como la de temperatura media, para poder hacer una valoración conjunta sobre la abundancia de gasterópodos.
+```{r}
+Gplot <- ggplot(Gdata, aes(x = humedad_media, y = temp_media, size = adultos_Deroceras.transecto, color = adultos_Deroceras.transecto)) +
+  geom_point(alpha = 0.7) +  
+  scale_size_continuous(range = c(3, 10)) +  
+  scale_color_gradient(low = "orange", high = "blue") +  
+  labs(title = "Relación entre abundancia de Deroceras, humedad y temperatura",
+       x = "Humedad media (%)",
+       y = "Temperatura media (°C)",
+       size = "Abundancia de adultos de Deroceras",
+       color = "Abundancia de adultos de Deroceras")  
+
+Gplot
+
+# Ruta y nombre del archivo a guardar
+output_file2 <- file.path(main_dir, "6_Gplot.pdf")
+
+ggsave(
+  filename = output_file2, 
+  plot = Gplot, 
+  width = 10, 
+  height = 7,
+  dpi = 300
+  )
+```
+En respuesta a la pregunta del enunciado del ejercicio, el gráfico muestra mayor abundancia de gasterópodos cuando la humedad media es superior al 60% y la temperatura media es inferior a 30 grados. En todo caso es llamativa la escasez de gasterópodos para la mencionada humedad cuando la temperatura es de alrededor de 20 grados para volver a aumentar cuando la temperatura en inferior a 20 grados.
+
+-----------------------------------------------
+
+## Ejercicio 8: Polinizadores
+
+En un invernadero se quiere evaluar la efectividad de la liberación de polinizadores criados en cautividad (Bombus sp.) sobre la producción de fruto de una determinada especie de arbusto mediterráneo para el que se dispone de tres variedades genéticamente diferenciadas (Polinizadores.csv). Se pide determinar el momento óptimo de liberación de los insectos polinizadores, para ello se requiere de un gráfico explicativo que pueda utilizarse en las campañas de divulgación con agricultores y dueños de viveros forestales locales. Adjuntar el script.
+
+### 1.Datos
+
+```{r}
+df_poli <- read.csv2(file4, header = TRUE)
+str(df_poli)
+summary(df_poli)
+
+```
+
+### 2. Gráfico
+En este caso he preferido realizar un gráfico de densidades para cada variedad. Posteriormente lo he dividido en gráfico de densidades para cada variedad y tipo de riego.
+
+```{r}
+
+plot_poli1 <-ggplot(df_poli, aes(x = Floracion_juliana, fill = Variedad)) +
+geom_density(alpha = 0.6) +
+labs(title = "Distribución del Periodo de Floración por Variedad",
+x = "Día Juliano de Floración",
+y = "Densidad de Floración",
+fill = "Variedad") +
+theme_minimal() +
+scale_fill_manual(values = c("macrocarpa" = "lightblue", "microcarpa" = "palegreen3", "multiflora" = "orange")) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+plot_poli1
+
+plot_poli2 <- ggplot(df_poli, aes(x = Floracion_juliana, fill = Variedad)) +
+  geom_density(alpha = 0.6) +
+  facet_wrap(~ Riego) +
+  labs(
+    title = "Distribución de floración juliana según variedad y riego",
+    x = "Floración juliana (días)",
+    y = "Densidad",
+    fill = "Variedad"
+  ) +
+  scale_fill_manual(values = c("macrocarpa" = "lightblue", "microcarpa" = "palegreen3", "multiflora" = "orange")) +  # Cambiar los colores aquí
+  theme(
+    strip.text = element_text(size = 12, face = "bold"),
+    legend.position = "bottom"
+  )
+
+plot_poli2
+
+# Ruta y nombre del archivo a guardar
+output_poli1 <- file.path(main_dir, "8_grafico_poli1.png")
+output_poli2 <- file.path(main_dir, "8_grafico_poli2.png")
+
+ggsave(
+  filename = output_poli1, 
+  plot = plot_poli1, 
+  width = 10, 
+  height = 7,
+  dpi = 300
+  )
+
+ggsave(
+  filename = output_poli2, 
+  plot = plot_poli2, 
+  width = 10, 
+  height = 7,
+  dpi = 300
+  )
+
+
+```
+
+En ambos casos los gráficos muestran que la suelta de polinizadores debería hacerse entre los 20 y 30 días, si la suelta se hace para obtener una polinización simultanea para todas las especies. Si nos centramos en la suelta específica por especie y riego, entonces las sueltas de polinizadores deberían hacerse del siguiente modo:
+- Macrocarpa: el periodo de suelta puede hacerse entre los 30 y 40 días independientemente del riego ya que la floración es similar en ambos casos.
+- Microcarpa: el pediodo de sulta de polinizadores debe hacerse entre los 15 y 25 días, independientemente del riego ya que la floración es similar. 
+- Multiflora: en este caso la floración es dependiente del tipo de riego. En el caso del riego doble, la suelta debe hacerse entre los días 25 y 27. En cambio para el riego normal el periodo de suelta puede hacerse entre los días 35 y 70.
+
+-----------------------------------------------
